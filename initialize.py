@@ -14,9 +14,10 @@ import streamlit as st
 import tiktoken
 from langchain_openai import ChatOpenAI
 from langchain_community.callbacks.streamlit import StreamlitCallbackHandler
-from langchain import SerpAPIWrapper
+from langchain_community.utilities import SerpAPIWrapper
 from langchain.tools import Tool
-from langchain.agents import AgentType, initialize_agent, load_tools
+from langchain.agents import AgentType, initialize_agent
+from langchain_community.agent_toolkits.load_tools import load_tools
 import utils
 import constants as ct
 
@@ -31,8 +32,10 @@ load_dotenv()
 # ローカル環境では.envから読み込み、Streamlit Cloudではst.secretsから読み込む
 try:
     if hasattr(st, 'secrets') and len(st.secrets) > 0:
-        for key in st.secrets:
-            if key not in os.environ:
+        # 環境変数として設定すべきキーのみを処理
+        env_keys = ['OPENAI_API_KEY', 'SERPAPI_API_KEY', 'SLACK_USER_TOKEN']
+        for key in env_keys:
+            if key in st.secrets and key not in os.environ:
                 os.environ[key] = str(st.secrets[key])
 except Exception as e:
     # secrets読み込みエラーは無視（ローカル環境の場合）
