@@ -117,6 +117,14 @@ SEARCH_CUSTOMER_COMMUNICATION_INFO_TOOL_NAME = "search_customer_communication_to
 SEARCH_CUSTOMER_COMMUNICATION_INFO_TOOL_DESCRIPTION = "顧客とのやりとりに関する情報を参照したい時に使う"
 SEARCH_WEB_INFO_TOOL_NAME = "search_web_tool"
 SEARCH_WEB_INFO_TOOL_DESCRIPTION = "自社サービス「HealthX」に関する質問で、Web検索が必要と判断した場合に使う"
+SEARCH_EMPLOYEE_INFO_TOOL_NAME = "search_employee_info_tool"
+SEARCH_EMPLOYEE_INFO_TOOL_DESCRIPTION = "従業員の情報（名前、役職、担当業務、スキルなど）を検索したい時に使う"
+SEARCH_INQUIRY_HISTORY_TOOL_NAME = "search_inquiry_history_tool"
+SEARCH_INQUIRY_HISTORY_TOOL_DESCRIPTION = "過去の問い合わせ対応履歴を検索したい時に使う"
+GET_CURRENT_TIME_TOOL_NAME = "get_current_time_tool"
+GET_CURRENT_TIME_TOOL_DESCRIPTION = "現在の日時情報（年月日、曜日、時刻）を取得したい時に使う"
+CALCULATOR_TOOL_NAME = "calculator_tool"
+CALCULATOR_TOOL_DESCRIPTION = "数値計算が必要な時に使う。入力は数式の文字列で、Pythonの評価式として計算される"
 
 
 # ==========================================

@@ -208,6 +208,109 @@ def run_customer_doc_chain(param):
     return ai_msg["answer"]
 
 
+def search_employee_info(query):
+    """
+    従業員情報を検索する関数
+    
+    Args:
+        query: 検索クエリ
+    
+    Returns:
+        従業員情報の検索結果
+    """
+    logger = logging.getLogger(ct.LOGGER_NAME)
+    logger.info(f"従業員情報検索実行: {query}")
+    
+    try:
+        loader = CSVLoader(file_path=ct.EMPLOYEE_FILE_PATH, encoding=ct.CSV_ENCODING)
+        docs = loader.load()
+        
+        # クエリに関連する従業員情報を検索
+        relevant_docs = [doc for doc in docs if query.lower() in doc.page_content.lower()]
+        
+        if relevant_docs:
+            result = "\n\n".join([doc.page_content for doc in relevant_docs[:3]])
+            return result
+        else:
+            return "該当する従業員情報が見つかりませんでした。"
+    except Exception as e:
+        logger.error(f"従業員情報検索エラー: {str(e)}")
+        return "従業員情報の検索中にエラーが発生しました。"
+
+
+def search_inquiry_history(query):
+    """
+    過去の問い合わせ対応履歴を検索する関数
+    
+    Args:
+        query: 検索クエリ
+    
+    Returns:
+        問い合わせ履歴の検索結果
+    """
+    logger = logging.getLogger(ct.LOGGER_NAME)
+    logger.info(f"問い合わせ履歴検索実行: {query}")
+    
+    try:
+        loader = CSVLoader(file_path=ct.INQUIRY_HISTORY_FILE_PATH, encoding=ct.CSV_ENCODING)
+        docs = loader.load()
+        
+        # クエリに関連する履歴を検索
+        relevant_docs = [doc for doc in docs if query.lower() in doc.page_content.lower()]
+        
+        if relevant_docs:
+            result = "\n\n".join([doc.page_content for doc in relevant_docs[:5]])
+            return result
+        else:
+            return "該当する問い合わせ履歴が見つかりませんでした。"
+    except Exception as e:
+        logger.error(f"問い合わせ履歴検索エラー: {str(e)}")
+        return "問い合わせ履歴の検索中にエラーが発生しました。"
+
+
+def get_current_time(query=""):
+    """
+    現在の日時情報を取得する関数
+    
+    Args:
+        query: クエリ（使用しないが、Tool interfaceのため引数として受け取る）
+    
+    Returns:
+        現在の日時情報
+    """
+    logger = logging.getLogger(ct.LOGGER_NAME)
+    logger.info("現在日時取得実行")
+    
+    now = datetime.datetime.now()
+    weekday_jp = ["月", "火", "水", "木", "金", "土", "日"]
+    weekday = weekday_jp[now.weekday()]
+    
+    return f"現在の日時: {now.strftime('%Y年%m月%d日')}（{weekday}曜日） {now.strftime('%H:%M:%S')}"
+
+
+def calculate(expression):
+    """
+    数式を評価して計算結果を返す関数
+    
+    Args:
+        expression: 計算する数式の文字列
+    
+    Returns:
+        計算結果
+    """
+    logger = logging.getLogger(ct.LOGGER_NAME)
+    logger.info(f"計算実行: {expression}")
+    
+    try:
+        # 安全性のため、evalの使用は制限された環境で行う
+        allowed_names = {"abs": abs, "round": round, "min": min, "max": max, "sum": sum}
+        result = eval(expression, {"__builtins__": {}}, allowed_names)
+        return f"計算結果: {result}"
+    except Exception as e:
+        logger.error(f"計算エラー: {str(e)}")
+        return f"計算中にエラーが発生しました: {str(e)}"
+
+
 def delete_old_conversation_log(result):
     """
     古い会話履歴の削除

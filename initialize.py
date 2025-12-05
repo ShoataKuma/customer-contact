@@ -145,9 +145,33 @@ def initialize_agent_executor():
         ),
         # Web検索用のTool
         Tool(
-            name = ct.SEARCH_WEB_INFO_TOOL_NAME,
+            name=ct.SEARCH_WEB_INFO_TOOL_NAME,
             func=search.run,
             description=ct.SEARCH_WEB_INFO_TOOL_DESCRIPTION
+        ),
+        # 従業員情報検索用のTool
+        Tool(
+            name=ct.SEARCH_EMPLOYEE_INFO_TOOL_NAME,
+            func=utils.search_employee_info,
+            description=ct.SEARCH_EMPLOYEE_INFO_TOOL_DESCRIPTION
+        ),
+        # 問い合わせ履歴検索用のTool
+        Tool(
+            name=ct.SEARCH_INQUIRY_HISTORY_TOOL_NAME,
+            func=utils.search_inquiry_history,
+            description=ct.SEARCH_INQUIRY_HISTORY_TOOL_DESCRIPTION
+        ),
+        # 現在日時取得用のTool
+        Tool(
+            name=ct.GET_CURRENT_TIME_TOOL_NAME,
+            func=utils.get_current_time,
+            description=ct.GET_CURRENT_TIME_TOOL_DESCRIPTION
+        ),
+        # 計算実行用のTool
+        Tool(
+            name=ct.CALCULATOR_TOOL_NAME,
+            func=utils.calculate,
+            description=ct.CALCULATOR_TOOL_DESCRIPTION
         )
     ]
 
