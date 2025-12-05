@@ -29,10 +29,14 @@ load_dotenv()
 
 # Streamlit Cloudのsecretsを環境変数として設定
 # ローカル環境では.envから読み込み、Streamlit Cloudではst.secretsから読み込む
-if hasattr(st, 'secrets'):
-    for key in st.secrets:
-        if key not in os.environ:
-            os.environ[key] = st.secrets[key]
+try:
+    if hasattr(st, 'secrets') and len(st.secrets) > 0:
+        for key in st.secrets:
+            if key not in os.environ:
+                os.environ[key] = str(st.secrets[key])
+except Exception as e:
+    # secrets読み込みエラーは無視（ローカル環境の場合）
+    pass
 
 
 ############################################################
@@ -118,24 +122,36 @@ def initialize_logger():
     """
     ログ出力の設定
     """
-    os.makedirs(ct.LOG_DIR_PATH, exist_ok=True)
-
     logger = logging.getLogger(ct.LOGGER_NAME)
 
     if logger.hasHandlers():
         return
 
-    log_handler = TimedRotatingFileHandler(
-        os.path.join(ct.LOG_DIR_PATH, ct.LOG_FILE),
-        when="D",
-        encoding="utf8"
-    )
-    formatter = logging.Formatter(
-        f"[%(levelname)s] %(asctime)s line %(lineno)s, in %(funcName)s, session_id={st.session_state.session_id}: %(message)s"
-    )
-    log_handler.setFormatter(formatter)
-    logger.setLevel(logging.INFO)
-    logger.addHandler(log_handler)
+    try:
+        # ログディレクトリの作成（失敗しても続行）
+        os.makedirs(ct.LOG_DIR_PATH, exist_ok=True)
+        
+        log_handler = TimedRotatingFileHandler(
+            os.path.join(ct.LOG_DIR_PATH, ct.LOG_FILE),
+            when="D",
+            encoding="utf8"
+        )
+        formatter = logging.Formatter(
+            f"[%(levelname)s] %(asctime)s line %(lineno)s, in %(funcName)s, session_id={st.session_state.session_id}: %(message)s"
+        )
+        log_handler.setFormatter(formatter)
+        logger.setLevel(logging.INFO)
+        logger.addHandler(log_handler)
+    except Exception as e:
+        # Streamlit Cloudなどでファイル書き込みができない場合、StreamHandlerを使用
+        stream_handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            f"[%(levelname)s] %(asctime)s line %(lineno)s, in %(funcName)s, session_id={st.session_state.session_id}: %(message)s"
+        )
+        stream_handler.setFormatter(formatter)
+        logger.setLevel(logging.INFO)
+        logger.addHandler(stream_handler)
+        logger.warning(f"ファイルログ作成失敗、標準出力に切り替え: {str(e)}")
 
 
 def initialize_agent_executor():
@@ -148,22 +164,27 @@ def initialize_agent_executor():
     if "agent_executor" in st.session_state:
         return
     
-    # 消費トークン数カウント用のオブジェクトを用意
-    st.session_state.enc = tiktoken.get_encoding(ct.ENCODING_KIND)
-    
-    st.session_state.llm = ChatOpenAI(model_name=ct.MODEL, temperature=ct.TEMPERATURE, streaming=True)
+    try:
+        # 消費トークン数カウント用のオブジェクトを用意
+        st.session_state.enc = tiktoken.get_encoding(ct.ENCODING_KIND)
+        
+        # LLMの初期化
+        st.session_state.llm = ChatOpenAI(model_name=ct.MODEL, temperature=ct.TEMPERATURE, streaming=True)
 
-    # 各Tool用のChainを作成
-    st.session_state.customer_doc_chain = utils.create_rag_chain(ct.DB_CUSTOMER_PATH)
-    st.session_state.service_doc_chain = utils.create_rag_chain(ct.DB_SERVICE_PATH)
-    st.session_state.company_doc_chain = utils.create_rag_chain(ct.DB_COMPANY_PATH)
-    st.session_state.rag_chain = utils.create_rag_chain(ct.DB_ALL_PATH)
+        # 各Tool用のChainを作成
+        st.session_state.customer_doc_chain = utils.create_rag_chain(ct.DB_CUSTOMER_PATH)
+        st.session_state.service_doc_chain = utils.create_rag_chain(ct.DB_SERVICE_PATH)
+        st.session_state.company_doc_chain = utils.create_rag_chain(ct.DB_COMPANY_PATH)
+        st.session_state.rag_chain = utils.create_rag_chain(ct.DB_ALL_PATH)
 
-    # Web検索用のToolを設定するためのオブジェクトを用意
-    search = SerpAPIWrapper()
-    
-    # LangChain標準のツールを読み込み（llm-math: 数学計算ツール）
-    standard_tools = load_tools(["llm-math"], llm=st.session_state.llm)
+        # Web検索用のToolを設定するためのオブジェクトを用意
+        search = SerpAPIWrapper()
+        
+        # LangChain標準のツールを読み込み（llm-math: 数学計算ツール）
+        standard_tools = load_tools(["llm-math"], llm=st.session_state.llm)
+    except Exception as e:
+        logger.error(f"Agent Executor初期化中にエラー: {str(e)}")
+        raise Exception(f"Agent Executor初期化エラー: {str(e)}")
     
     # Agent Executorに渡すTool一覧を用意
     tools = [
