@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 from langchain_community.callbacks.streamlit import StreamlitCallbackHandler
 from langchain import SerpAPIWrapper
 from langchain.tools import Tool
-from langchain.agents import AgentType, initialize_agent
+from langchain.agents import AgentType, initialize_agent, load_tools
 import utils
 import constants as ct
 
@@ -123,6 +123,10 @@ def initialize_agent_executor():
 
     # Web検索用のToolを設定するためのオブジェクトを用意
     search = SerpAPIWrapper()
+    
+    # LangChain標準のツールを読み込み（llm-math: 数学計算ツール）
+    standard_tools = load_tools(["llm-math"], llm=st.session_state.llm)
+    
     # Agent Executorに渡すTool一覧を用意
     tools = [
         # 会社に関するデータ検索用のTool
@@ -166,14 +170,11 @@ def initialize_agent_executor():
             name=ct.GET_CURRENT_TIME_TOOL_NAME,
             func=utils.get_current_time,
             description=ct.GET_CURRENT_TIME_TOOL_DESCRIPTION
-        ),
-        # 計算実行用のTool
-        Tool(
-            name=ct.CALCULATOR_TOOL_NAME,
-            func=utils.calculate,
-            description=ct.CALCULATOR_TOOL_DESCRIPTION
         )
     ]
+    
+    # 標準ツールを追加
+    tools.extend(standard_tools)
 
     # Agent Executorの作成
     st.session_state.agent_executor = initialize_agent(

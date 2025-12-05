@@ -288,29 +288,6 @@ def get_current_time(query=""):
     return f"現在の日時: {now.strftime('%Y年%m月%d日')}（{weekday}曜日） {now.strftime('%H:%M:%S')}"
 
 
-def calculate(expression):
-    """
-    数式を評価して計算結果を返す関数
-    
-    Args:
-        expression: 計算する数式の文字列
-    
-    Returns:
-        計算結果
-    """
-    logger = logging.getLogger(ct.LOGGER_NAME)
-    logger.info(f"計算実行: {expression}")
-    
-    try:
-        # 安全性のため、evalの使用は制限された環境で行う
-        allowed_names = {"abs": abs, "round": round, "min": min, "max": max, "sum": sum}
-        result = eval(expression, {"__builtins__": {}}, allowed_names)
-        return f"計算結果: {result}"
-    except Exception as e:
-        logger.error(f"計算エラー: {str(e)}")
-        return f"計算中にエラーが発生しました: {str(e)}"
-
-
 def delete_old_conversation_log(result):
     """
     古い会話履歴の削除

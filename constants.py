@@ -123,8 +123,6 @@ SEARCH_INQUIRY_HISTORY_TOOL_NAME = "search_inquiry_history_tool"
 SEARCH_INQUIRY_HISTORY_TOOL_DESCRIPTION = "過去の問い合わせ対応履歴を検索したい時に使う"
 GET_CURRENT_TIME_TOOL_NAME = "get_current_time_tool"
 GET_CURRENT_TIME_TOOL_DESCRIPTION = "現在の日時情報（年月日、曜日、時刻）を取得したい時に使う"
-CALCULATOR_TOOL_NAME = "calculator_tool"
-CALCULATOR_TOOL_DESCRIPTION = "数値計算が必要な時に使う。入力は数式の文字列で、Pythonの評価式として計算される"
 
 
 # ==========================================
