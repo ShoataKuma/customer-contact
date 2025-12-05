@@ -354,98 +354,106 @@ def notice_slack(chat_message):
     Returns:
         問い合わせサンクスメッセージ
     """
-
-    # Slack通知用のAgent Executorを作成
-    toolkit = SlackToolkit()
-    tools = toolkit.get_tools()
-    agent_executor = initialize_agent(
-        llm=st.session_state.llm,
-        tools=tools,
-        agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION
-    )
-
-    # 担当者割り振りに使う用の「従業員情報」と「問い合わせ対応履歴」の読み込み
-    loader = CSVLoader(ct.EMPLOYEE_FILE_PATH, encoding=ct.CSV_ENCODING)
-    docs = loader.load()
-    loader = CSVLoader(ct.INQUIRY_HISTORY_FILE_PATH, encoding=ct.CSV_ENCODING)
-    docs_history = loader.load()
-
-    # OSがWindowsの場合、Unicode正規化と、cp932（Windows用の文字コード）で表現できない文字を除去
-    for doc in docs:
-        doc.page_content = adjust_string(doc.page_content)
-        for key in doc.metadata:
-            doc.metadata[key] = adjust_string(doc.metadata[key])
-    for doc in docs_history:
-        doc.page_content = adjust_string(doc.page_content)
-        for key in doc.metadata:
-            doc.metadata[key] = adjust_string(doc.metadata[key])
-
-    # 問い合わせ内容と関連性が高い従業員情報を取得するために、参照先データを整形
-    docs_all = adjust_reference_data(docs, docs_history)
+    logger = logging.getLogger(ct.LOGGER_NAME)
     
-    # 形態素解析による日本語の単語分割を行うため、参照先データからテキストのみを抽出
-    docs_all_page_contents = []
-    for doc in docs_all:
-        docs_all_page_contents.append(doc.page_content)
+    try:
+        # Slack通知用のAgent Executorを作成
+        toolkit = SlackToolkit()
+        tools = toolkit.get_tools()
+        agent_executor = initialize_agent(
+            llm=st.session_state.llm,
+            tools=tools,
+            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION
+        )
 
-    # Retrieverの作成
-    embeddings = OpenAIEmbeddings()
-    db = Chroma.from_documents(docs_all, embedding=embeddings)
-    retriever = db.as_retriever(search_kwargs={"k": ct.TOP_K})
-    bm25_retriever = BM25Retriever.from_texts(
-        docs_all_page_contents,
-        preprocess_func=preprocess_func,
-        k=ct.TOP_K
-    )
-    retriever = EnsembleRetriever(
-        retrievers=[bm25_retriever, retriever],
-        weights=ct.RETRIEVER_WEIGHTS
-    )
+        # 担当者割り振りに使う用の「従業員情報」と「問い合わせ対応履歴」の読み込み
+        loader = CSVLoader(ct.EMPLOYEE_FILE_PATH, encoding=ct.CSV_ENCODING)
+        docs = loader.load()
+        loader = CSVLoader(ct.INQUIRY_HISTORY_FILE_PATH, encoding=ct.CSV_ENCODING)
+        docs_history = loader.load()
 
-    # 問い合わせ内容と関連性の高い従業員情報を取得
-    employees = retriever.invoke(chat_message)
+        # OSがWindowsの場合、Unicode正規化と、cp932（Windows用の文字コード）で表現できない文字を除去
+        for doc in docs:
+            doc.page_content = adjust_string(doc.page_content)
+            for key in doc.metadata:
+                doc.metadata[key] = adjust_string(doc.metadata[key])
+        for doc in docs_history:
+            doc.page_content = adjust_string(doc.page_content)
+            for key in doc.metadata:
+                doc.metadata[key] = adjust_string(doc.metadata[key])
+
+        # 問い合わせ内容と関連性が高い従業員情報を取得するために、参照先データを整形
+        docs_all = adjust_reference_data(docs, docs_history)
+        
+        # 形態素解析による日本語の単語分割を行うため、参照先データからテキストのみを抽出
+        docs_all_page_contents = []
+        for doc in docs_all:
+            docs_all_page_contents.append(doc.page_content)
+
+        # Retrieverの作成
+        embeddings = OpenAIEmbeddings()
+        db = Chroma.from_documents(docs_all, embedding=embeddings)
+        retriever = db.as_retriever(search_kwargs={"k": ct.TOP_K})
+        bm25_retriever = BM25Retriever.from_texts(
+            docs_all_page_contents,
+            preprocess_func=preprocess_func,
+            k=ct.TOP_K
+        )
+        retriever = EnsembleRetriever(
+            retrievers=[bm25_retriever, retriever],
+            weights=ct.RETRIEVER_WEIGHTS
+        )
+
+        # 問い合わせ内容と関連性の高い従業員情報を取得
+        employees = retriever.invoke(chat_message)
+        
+        # プロンプトに埋め込むための従業員情報テキストを取得
+        context = get_context(employees)
+
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", ct.SYSTEM_PROMPT_EMPLOYEE_SELECTION)
+        ])
+        # フォーマット文字列を生成
+        output_parser = CommaSeparatedListOutputParser()
+        format_instruction = output_parser.get_format_instructions()
+
+        # 問い合わせ内容と関連性が高い従業員のID一覧を取得
+        messages = prompt_template.format_prompt(context=context, query=chat_message, format_instruction=format_instruction).to_messages()
+        employee_id_response = st.session_state.llm(messages)
+        employee_ids = output_parser.parse(employee_id_response.content)
+
+        # 問い合わせ内容と関連性が高い従業員情報を、IDで照合して取得
+        target_employees = get_target_employees(employees, employee_ids)
+        
+        # 問い合わせ内容と関連性が高い従業員情報の中から、SlackIDのみを抽出
+        slack_ids = get_slack_ids(target_employees)
+        
+        # 抽出したSlackIDの連結テキストを生成
+        slack_id_text = create_slack_id_text(slack_ids)
+        
+        # プロンプトに埋め込むための（問い合わせ内容と関連性が高い）従業員情報テキストを取得
+        context = get_context(target_employees)
+
+        # 現在日時を取得
+        now_datetime = get_datetime()
+
+        # Slack通知用のプロンプト生成
+        prompt = PromptTemplate(
+            input_variables=["slack_id_text", "query", "context", "now_datetime"],
+            template=ct.SYSTEM_PROMPT_NOTICE_SLACK,
+        )
+        prompt_message = prompt.format(slack_id_text=slack_id_text, query=chat_message, context=context, now_datetime=now_datetime)
+
+        # Slack通知の実行
+        agent_executor.invoke({"input": prompt_message})
+
+        return ct.CONTACT_THANKS_MESSAGE
     
-    # プロンプトに埋め込むための従業員情報テキストを取得
-    context = get_context(employees)
-
-    prompt_template = ChatPromptTemplate.from_messages([
-        ("system", ct.SYSTEM_PROMPT_EMPLOYEE_SELECTION)
-    ])
-    # フォーマット文字列を生成
-    output_parser = CommaSeparatedListOutputParser()
-    format_instruction = output_parser.get_format_instructions()
-
-    # 問い合わせ内容と関連性が高い従業員のID一覧を取得
-    messages = prompt_template.format_prompt(context=context, query=chat_message, format_instruction=format_instruction).to_messages()
-    employee_id_response = st.session_state.llm(messages)
-    employee_ids = output_parser.parse(employee_id_response.content)
-
-    # 問い合わせ内容と関連性が高い従業員情報を、IDで照合して取得
-    target_employees = get_target_employees(employees, employee_ids)
-    
-    # 問い合わせ内容と関連性が高い従業員情報の中から、SlackIDのみを抽出
-    slack_ids = get_slack_ids(target_employees)
-    
-    # 抽出したSlackIDの連結テキストを生成
-    slack_id_text = create_slack_id_text(slack_ids)
-    
-    # プロンプトに埋め込むための（問い合わせ内容と関連性が高い）従業員情報テキストを取得
-    context = get_context(target_employees)
-
-    # 現在日時を取得
-    now_datetime = get_datetime()
-
-    # Slack通知用のプロンプト生成
-    prompt = PromptTemplate(
-        input_variables=["slack_id_text", "query", "context", "now_datetime"],
-        template=ct.SYSTEM_PROMPT_NOTICE_SLACK,
-    )
-    prompt_message = prompt.format(slack_id_text=slack_id_text, query=chat_message, context=context, now_datetime=now_datetime)
-
-    # Slack通知の実行
-    agent_executor.invoke({"input": prompt_message})
-
-    return ct.CONTACT_THANKS_MESSAGE
+    except Exception as e:
+        logger.error(f"Slack通知処理エラー: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise Exception(f"Slack通知処理に失敗しました: {str(e)}")
 
 
 def adjust_reference_data(docs, docs_history):
