@@ -34,6 +34,11 @@ try:
 except Exception as e:
     logger.error(f"{ct.INITIALIZE_ERROR_MESSAGE}\n{e}")
     st.error(utils.build_error_message(ct.INITIALIZE_ERROR_MESSAGE), icon=ct.ERROR_ICON)
+    # デバッグ用に詳細なエラー情報を表示
+    with st.expander("エラー詳細（デバッグ用）"):
+        st.code(str(e))
+        import traceback
+        st.code(traceback.format_exc())
     st.stop()
 
 # アプリ起動時のログ出力

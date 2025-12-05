@@ -68,16 +68,20 @@ def check_api_keys():
     missing_keys = []
     for key, name in required_keys.items():
         if not os.getenv(key):
-            missing_keys.append(name)
+            missing_keys.append(f"{name} ({key})")
     
     if missing_keys:
-        error_msg = f"以下の環境変数が設定されていません: {', '.join(missing_keys)}\n"
-        error_msg += "Streamlit Cloudの場合: Settings > Secrets で設定してください\n"
-        error_msg += "ローカル環境の場合: .envファイルに設定してください"
+        error_msg = f"以下の環境変数が設定されていません:\n"
+        for key in missing_keys:
+            error_msg += f"  - {key}\n"
+        error_msg += "\n【Streamlit Cloudの場合】\n"
+        error_msg += "Settings > Secrets で以下の形式で設定してください:\n"
+        error_msg += "OPENAI_API_KEY = \"your-key-here\"\n"
+        error_msg += "SERPAPI_API_KEY = \"your-key-here\"\n"
+        error_msg += "SLACK_USER_TOKEN = \"your-token-here\"\n"
+        error_msg += "\n【ローカル環境の場合】\n"
+        error_msg += ".envファイルに設定してください"
         raise ValueError(error_msg)
-    initialize_logger()
-    # Agent Executorを作成
-    initialize_agent_executor()
 
 
 def initialize_session_state():
