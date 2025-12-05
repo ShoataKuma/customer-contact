@@ -27,6 +27,13 @@ import constants as ct
 ############################################################
 load_dotenv()
 
+# Streamlit Cloudのsecretsを環境変数として設定
+# ローカル環境では.envから読み込み、Streamlit Cloudではst.secretsから読み込む
+if hasattr(st, 'secrets'):
+    for key in st.secrets:
+        if key not in os.environ:
+            os.environ[key] = st.secrets[key]
+
 
 ############################################################
 # 関数定義
@@ -36,11 +43,38 @@ def initialize():
     """
     画面読み込み時に実行する初期化処理
     """
+    # APIキーの確認
+    check_api_keys()
     # 初期化データの用意
     initialize_session_state()
     # ログ出力用にセッションIDを生成
     initialize_session_id()
     # ログ出力の設定
+    initialize_logger()
+    # Agent Executorを作成
+    initialize_agent_executor()
+
+
+def check_api_keys():
+    """
+    必要なAPIキーが設定されているか確認
+    """
+    required_keys = {
+        "OPENAI_API_KEY": "OpenAI API Key",
+        "SERPAPI_API_KEY": "SerpAPI Key",
+        "SLACK_USER_TOKEN": "Slack User Token"
+    }
+    
+    missing_keys = []
+    for key, name in required_keys.items():
+        if not os.getenv(key):
+            missing_keys.append(name)
+    
+    if missing_keys:
+        error_msg = f"以下の環境変数が設定されていません: {', '.join(missing_keys)}\n"
+        error_msg += "Streamlit Cloudの場合: Settings > Secrets で設定してください\n"
+        error_msg += "ローカル環境の場合: .envファイルに設定してください"
+        raise ValueError(error_msg)
     initialize_logger()
     # Agent Executorを作成
     initialize_agent_executor()
